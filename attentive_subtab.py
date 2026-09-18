@@ -31,14 +31,11 @@ from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_sco
 # 1) CONFIGURATION & PATHS
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR = os.path.join(BASE_DIR, "cache")
-RESULTS_DIR = os.path.join(BASE_DIR, "results")
-os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # Points to your newly generated chronological dataset
-DATA_CACHE_PATH = os.path.join(CACHE_DIR, "hyphatia_paper_features_time_sorted_v2.npz")
-RESULTS_PATH = os.path.join(RESULTS_DIR, "model_evaluation_results.npz")
-SUMMARY_PATH = os.path.join(RESULTS_DIR, "9_seed_summary.txt")
+DATA_CACHE_PATH = os.path.join(BASE_DIR, "attentive_subtab_dataset.npz")
+RESULTS_PATH = os.path.join(BASE_DIR, "model_evaluation_results.npz")
+SUMMARY_PATH = os.path.join(BASE_DIR, "9_seed_summary.txt")
 
 SEEDS_9 = [42, 43, 44, 45, 46, 47, 48, 49, 50]
 

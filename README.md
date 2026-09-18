@@ -137,7 +137,7 @@ Rather than the default 0.5 threshold, the decision threshold that maximizes F1 
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/attentive-subtab-fraud-detection.git
+git clone https://github.com/<zohayer-mehtab>/attentive-subtab-fraud-detection.git
 cd attentive-subtab-fraud-detection
 
 # Create virtual environment
@@ -150,7 +150,7 @@ pip install -r requirements.txt
 
 ### Running
 
-`attentive_subtab.py` expects a preprocessed, chronologically split dataset cached as an `.npz` file (with `X_train`, `X_test`, `y_train`, `y_test` arrays) at `./cache/hyphatia_paper_features_time_sorted_v2.npz`. Point `DATA_CACHE_PATH` at your own cache if it lives elsewhere, then:
+`attentive_subtab.py` expects a preprocessed, chronologically split dataset cached as an `.npz` file (with `X_train`, `X_test`, `y_train`, `y_test` arrays) located in the root directory at `./attentive_subtab_dataset.npz`. Point `DATA_CACHE_PATH` at your own cache if it lives elsewhere, then:
 
 ```bash
 python attentive_subtab.py
