@@ -1,0 +1,19 @@
+===== 9-SEED SUMMARY (Mean ± Std) =====
+
+--- TRAIN SET METRICS ---
+AUROC:           0.9464 ± 0.0577
+PR-AUC:          0.6142 ± 0.2313
+Binary Precision:0.4005 ± 0.1294
+Binary Recall:   0.8550 ± 0.1878
+Binary F1:       0.5420 ± 0.1514
+Macro-F1:        0.7498 ± 0.0841
+Macro-Precision: 0.6960 ± 0.0694
+
+--- TEST SET METRICS ---
+AUROC:           0.7813 ± 0.0190
+PR-AUC:          0.0646 ± 0.0108
+Binary Precision:0.0561 ± 0.0069
+Binary Recall:   0.6097 ± 0.0694
+Binary F1:       0.1026 ± 0.0117
+Macro-F1:        0.4956 ± 0.0133
+Macro-Precision: 0.5236 ± 0.0038
