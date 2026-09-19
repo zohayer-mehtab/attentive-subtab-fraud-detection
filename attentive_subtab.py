@@ -19,33 +19,36 @@ Usage:
 import os
 import time
 import copy
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score, average_precision_score, \
-    precision_recall_curve
+from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score, average_precision_score, precision_recall_curve
 
 # ==========================================
-# 1) CONFIGURATION & PATHS
+# 1) CONFIGURATION & ARGUMENTS
 # ==========================================
+parser = argparse.ArgumentParser(description="Attentive-SubTab Fraud Detection")
+parser.add_argument("--no-attention", action="store_true", help="Use mean pooling instead of MHSA")
+parser.add_argument("--no-pretrain", action="store_true", help="Skip the SSL pretraining phase")
+parser.add_argument("--no-swap-noise", action="store_true", help="Disable swap noise during pretraining")
+args = parser.parse_args()
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Points to your newly generated chronological dataset
 DATA_CACHE_PATH = os.path.join(BASE_DIR, "attentive_subtab_dataset.npz")
 RESULTS_PATH = os.path.join(BASE_DIR, "model_evaluation_results.npz")
 SUMMARY_PATH = os.path.join(BASE_DIR, "9_seed_summary.txt")
 
 SEEDS_9 = [42, 43, 44, 45, 46, 47, 48, 49, 50]
-
 BATCH_SIZE = 1024
-EPOCHS_PRETRAIN = 5
+EPOCHS_PRETRAIN = 0 if args.no_pretrain else 5
 EPOCHS_FINETUNE = 50
 LEARNING_RATE = 1e-3
 HIDDEN_DIM = 1024
 N_SUBSETS = 4
-MASKING_RATIO = 0.2
+MASKING_RATIO = 0.0 if args.no_swap_noise else 0.2
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -97,12 +100,17 @@ class Decoder(nn.Module):
 
 
 class AttentionFusion(nn.Module):
-    def __init__(self, latent_dim, num_heads=4):
+    def __init__(self, latent_dim, num_heads=4, use_attention=True):
         super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim=latent_dim, num_heads=num_heads, batch_first=True)
-        self.layer_norm = nn.LayerNorm(latent_dim)
+        self.use_attention = use_attention
+        if self.use_attention:
+            self.attention = nn.MultiheadAttention(embed_dim=latent_dim, num_heads=num_heads, batch_first=True)
+            self.layer_norm = nn.LayerNorm(latent_dim)
 
     def forward(self, x_stack):
+        if not self.use_attention:
+            return x_stack.mean(dim=1)
+
         attn_out, _ = self.attention(x_stack, x_stack, x_stack)
         out = self.layer_norm(x_stack + attn_out)
         return out.mean(dim=1)
@@ -149,7 +157,7 @@ def run_one_seed(seed, X_train_full, X_test, y_train_full, y_test, subset_indice
     encoders = nn.ModuleList([Encoder(subset_size, HIDDEN_DIM) for _ in range(N_SUBSETS)]).to(device)
     decoders = nn.ModuleList([Decoder(HIDDEN_DIM // 2, subset_size) for _ in range(N_SUBSETS)]).to(device)
 
-    fusion_module = AttentionFusion(HIDDEN_DIM // 2).to(device)
+    fusion_module = AttentionFusion(HIDDEN_DIM // 2, use_attention=not args.no_attention).to(device)
     classifier = ClassifierHead(HIDDEN_DIM // 2).to(device)
 
     opt_pretrain = optim.AdamW(list(encoders.parameters()) + list(decoders.parameters()), lr=LEARNING_RATE,

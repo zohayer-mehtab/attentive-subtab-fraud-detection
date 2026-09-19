@@ -8,7 +8,7 @@ Department of Computer Science, American International University-Bangladesh, Dh
 
 ## 📋 Abstract
 
-Fraud detection on transactional tabular data is hampered by extreme class imbalance and the high cost of labeled data. While self-supervised learning (SSL) alleviates label scarcity, existing subset-based SSL approaches rely on shared encoders and simple mean-pooling, assigning every feature subset equal weight regardless of the actual informativeness. We present Attentive-SubTab, an architecture that partitions transaction features into subsets, assigns independent, subset-specific encoders to each one, and fuses their representations using multi-head self-attention. To handle the extreme minority class, the model is evaluated at an F1-optimal decision threshold. On the IEEE-CIS dataset, Attentive-SubTab reaches a mean AUROC of 0.7835 and recall of 0.6912, substantially improving upon a tuned XGBoost baseline (0.6602 AUROC, 0.1348 recall), though XGBoost retains a higher PR-AUC (0.1073 vs. 0.0665). On the independent ULB dataset, the model again has a higher AUROC than XGBoost but a lower PR-AUC and recall. Ablations show that dedicated encoders alone, without attention fusion, are statistically indistinguishable from a monolithic baseline. We conclude that Attentive-SubTab is best characterized as a recall-oriented fraud detector suited to high-volume triage, although its deployment value still has to be established through cost-sensitive evaluation.
+Fraud detection on transactional tabular data is hampered by extreme class imbalance and the high cost of labeled data. While self-supervised learning (SSL) alleviates label scarcity, existing subset-based SSL approaches rely on shared encoders and simple mean-pooling, assigning every feature subset equal weight regardless of the actual informativeness. We present Attentive-SubTab, an architecture that partitions transaction features into subsets, assigns independent, subset-specific encoders to each one, and fuses their representations using multi-head self-attention. To handle the extreme minority class, the model is evaluated at an F1-optimal decision threshold. On the IEEE-CIS dataset, Attentive-SubTab reaches a mean AUROC of 0.7813 and recall of 0.6097, substantially improving upon a tuned XGBoost baseline (0.6602 AUROC, 0.1348 recall), though XGBoost retains a higher PR-AUC (0.1073 vs. 0.0646). On the independent ULB dataset, the model again has a higher AUROC than XGBoost but a lower PR-AUC and recall. Ablations show that dedicated encoders alone, without attention fusion, are statistically indistinguishable from a monolithic baseline. We conclude that Attentive-SubTab is best characterized as a recall-oriented fraud detector suited to high-volume triage, although its deployment value still has to be established through cost-sensitive evaluation.
 
 ---
 
@@ -191,7 +191,9 @@ Attentive-SubTab substantially raises recall and AUROC relative to XGBoost, at t
 | Decision Tree | 0.5015 ± 0.0032 | 0.0177 ± 0.0001 | 0.1627 ± 0.0092 |
 | XGBoost | 0.6602 ± 0.0000 | **0.1073 ± 0.0000** | 0.1348 ± 0.0000 |
 | Hyphatia (SubTab + MLP) | 0.6744 | – | – |
-| **Attentive-SubTab (Ours)** | **0.7835 ± 0.0201** | 0.0665 ± 0.0125 | **0.6912 ± 0.0630** |
+| **Attentive-SubTab (Ours)** | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0694** |
+
+Baseline XGBoost and Decision Tree models were implemented using standard scikit-learn and xgboost Python libraries with chronological training/testing splits, and are not included in this repository to maintain focus on the proposed neural architecture.
 
 ![AUROC, PR-AUC, and recall of each model on IEEE-CIS](assets/main_results.png)
 
@@ -205,7 +207,7 @@ Attentive-SubTab substantially raises recall and AUROC relative to XGBoost, at t
 
 ### Decision-Threshold Analysis
 
-At the F1-optimal threshold for a representative seed: 184 true positives, 83 false negatives, 2,762 false positives, 11,521 true negatives (14,550 total). This gives an alert rate of 20.25%, precision of 6.25%, recall of 68.9%, and specificity of 80.7% — a plausible starting point for a manual-review triage system, though full operational readiness requires deployment-specific parameters (investigator capacity, cost per review, loss avoided per detected fraud case) not established in this study.
+At the F1-optimal threshold for a representative seed: 179 true positives, 88 false negatives, 2,748 false positives, 11,535 true negatives (14,550 total). This gives an alert rate of 20.12%, precision of 6.12%, recall of 67.04%, and specificity of 80.76% — a plausible starting point for a manual-review triage system, though full operational readiness requires deployment-specific parameters (investigator capacity, cost per review, loss avoided per detected fraud case) not established in this study.
 
 ![Confusion matrix at the F1-optimal threshold](assets/confusion_matrix.png)
 
@@ -222,7 +224,7 @@ At the F1-optimal threshold for a representative seed: 184 true positives, 83 fa
 | *Track 1: Architectural foundation* | | | |
 | Monolithic autoencoder (single shared encoder) | 0.7622 ± 0.0438 | **0.1397 ± 0.0494** | 0.5676 ± 0.1447 |
 | *Track 2: Attentive-SubTab mechanics* | | | |
-| **Full model** (dedicated encoders + attention) | **0.7835 ± 0.0201** | 0.0665 ± 0.0125 | **0.6912 ± 0.0630** |
+| **Full model** (dedicated encoders + attention) | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0694** |
 | w/o attention fusion (dedicated encoders + mean pooling) | 0.7514 ± 0.0300 | 0.1539 ± 0.0293 | 0.5385 ± 0.0842 |
 | w/o pretraining | 0.7774 ± 0.0314 | 0.1037 ± 0.0500 | 0.6138 ± 0.1374 |
 | w/o swap noise | 0.7825 ± 0.0305 | 0.0622 ± 0.0104 | 0.6309 ± 0.1437 |
@@ -252,6 +254,14 @@ The same architecture, trained and evaluated entirely within ULB with no dataset
 | **Attentive-SubTab** | **0.9856 ± 0.0020** | 0.7219 ± 0.0485 | 0.7037 ± 0.0469 |
 
 Attentive-SubTab reaches a significantly higher AUROC than XGBoost (t ≈ 7.28, p < .001), but significantly lower PR-AUC (t ≈ −3.65, p < .01) and somewhat lower recall (t ≈ −2.11, p ≈ .05) — the same "AUROC up, PR-AUC and recall trade off differently" pattern as on IEEE-CIS, on a dataset with a completely different feature representation (anonymized PCA components vs. engineered, semantically grouped features).
+
+### ULB Dataset Access and Formatting
+Due to file size constraints, the preprocessed ULB dataset is not included in this repository. To reproduce the ULB results:
+1. Download the public ULB Credit Card Fraud dataset (described in Dal Pozzolo et al., 2015).
+2. Sort the transactions chronologically using the `Time` feature to prevent temporal leakage.
+3. Apply a chronological 80/20 train/test split.
+4. Save the resulting features and labels into a standard NumPy archive (`ulb_dataset.npz`) containing the arrays `X_train`, `X_test`, `y_train`, and `y_test`.
+5. Point the `DATA_CACHE_PATH` in `attentive_subtab.py` to this new archive to evaluate the architecture on the ULB feature space.
 
 ---
 
