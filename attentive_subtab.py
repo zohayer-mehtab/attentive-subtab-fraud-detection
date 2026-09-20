@@ -30,11 +30,14 @@ from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_sco
 # ==========================================
 # 1) CONFIGURATION & ARGUMENTS
 # ==========================================
-parser = argparse.ArgumentParser(description="Attentive-SubTab Fraud Detection")
 parser.add_argument("--no-attention", action="store_true", help="Use mean pooling instead of MHSA")
 parser.add_argument("--no-pretrain", action="store_true", help="Skip the SSL pretraining phase")
 parser.add_argument("--no-swap-noise", action="store_true", help="Disable swap noise during pretraining")
+parser.add_argument("--monolithic", action="store_true", help="Use a single monolithic encoder")
+parser.add_argument("--no-imbalance-weighting", action="store_true", help="Disable class ratio weighting")
 args = parser.parse_args()
+
+N_SUBSETS = 1 if args.monolithic else 4
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_CACHE_PATH = os.path.join(BASE_DIR, "attentive_subtab_dataset.npz")
@@ -170,8 +173,14 @@ def run_one_seed(seed, X_train_full, X_test, y_train_full, y_test, subset_indice
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt_finetune, mode='max', factor=0.5, patience=3, min_lr=1e-6)
 
+    # Phase 1 setup
     mse_loss = nn.MSELoss()
-    bce_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([imbalance_ratio]).to(device))
+    
+    if args.no_imbalance_weighting:
+        bce_loss = nn.BCEWithLogitsLoss()
+        print("  -> Imbalance weighting disabled.")
+    else:
+        bce_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([imbalance_ratio]).to(device))
 
     # PHASE 1: SSL PRE-TRAINING
     for epoch in range(EPOCHS_PRETRAIN):
@@ -319,7 +328,7 @@ def run_one_seed(seed, X_train_full, X_test, y_train_full, y_test, subset_indice
     print(f"  -> Final Test AUROC for Seed {seed}: {auroc:.4f} | Recall: {recall:.4f}")
 
     test_metrics = [auroc, pr_auc, precision, recall, f1, macro_f1, macro_prec]
-    return train_metrics, test_metrics, probs, preds
+    return train_metrics, test_metrics, probs, preds, best_val_auc
 
 
 # ==========================================
@@ -355,19 +364,20 @@ def main():
 
     results_train_metrics = []
     results_test_metrics = []
-    best_auroc = 0.0
+    best_val_auc_global = 0.0
     best_probs = None
     best_preds = None
 
     for seed in SEEDS_9:
         print(f"\n{'=' * 40}\nStarting Training for Seed: {seed}\n{'=' * 40}")
-        train_metrics, test_metrics, probs, preds = run_one_seed(seed, X_train, X_test, y_train, y_test,
+        train_metrics, test_metrics, probs, preds, val_auc = run_one_seed(seed, X_train, X_test, y_train, y_test,
                                                                  subset_indices_t)
         results_train_metrics.append(train_metrics)
         results_test_metrics.append(test_metrics)
 
-        if test_metrics[0] > best_auroc:
-            best_auroc = test_metrics[0]
+        # FIX: Select best model on Validation AUROC, not Test AUROC to prevent data leakage
+        if val_auc > best_val_auc_global:
+            best_val_auc_global = val_auc
             best_probs = probs
             best_preds = preds
 
@@ -413,6 +423,7 @@ def main():
         y_true=y_test,
         y_probs=best_probs,
         y_preds=best_preds,
+        val_auc=best_val_auc_global,
         metrics=test_means[:5]
     )
     print(f"Visualizer data saved to: {RESULTS_PATH}")
