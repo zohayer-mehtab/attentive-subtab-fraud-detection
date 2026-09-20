@@ -236,7 +236,7 @@ At the F1-optimal threshold for a representative seed: 179 true positives, 88 fa
 
 **Key finding (H3, attention fusion — supported for AUROC, borderline for recall)**: comparing the full model against the no-attention variant isolates attention's effect: it raises AUROC from 0.7514 → 0.7813 (t ≈ 2.48, p ≈ .03) and recall from 0.5385 → 0.6097, though high seed-to-seed variance keeps this short of conventional significance (t ≈ 2.03, p ≈ .06). It significantly lowers PR-AUC from 0.1539 → 0.0665 (t ≈ −8.23, p < .001). The clearest unambiguous architectural effect of attention is therefore the AUROC/PR-AUC trade-off; the recall gain is directionally consistent but not decisively established here.
 
-**Key finding (H1, subsetting + dedicated encoding — not supported in isolation)**: the monolithic single-encoder baseline and the no-attention (dedicated encoders + mean-pooling) variant are statistically indistinguishable on all three metrics, despite the four dedicated encoders together holding roughly 4× the parameters of the monolithic encoder. Dedicated encoding alone does not measurably help; the benefit only appears once attention fusion is added on top.
+**Key finding (H1, subsetting + dedicated encoding — not supported in isolation)**: the monolithic single-encoder baseline and the no-attention (dedicated encoders + mean-pooling) variant are statistically indistinguishable on all three metrics, despite the four dedicated encoders together holding roughly 2× the parameters of the monolithic encoder. Dedicated encoding alone does not measurably help; the benefit only appears once attention fusion is added on top.
 
 ---
 
@@ -273,7 +273,7 @@ Due to file size constraints, the preprocessed ULB dataset is not included in th
 |---|---|---|
 | H1 | Subsetting + dedicated encoders improve on a monolithic encoder | Not supported in isolation (n.s. on all three metrics) |
 | H2 | Dedicated encoders outperform a shared encoder, subsets held fixed | Not directly tested (missing ablation cell — see Limitations) |
-| H3 | Attention fusion improves on mean-pooling | Supported for recall and AUROC (p < .05); PR-AUC decreases significantly (p < .001) — a trade-off |
+| H3 | Attention fusion improves on mean-pooling | Supported for AUROC (p < .05); recall improves in the same direction but falls short of significance (p ≈ .06); PR-AUC decreases significantly (p < .001) |
 | H4 | Class-ratio weighting improves recall | Directionally consistent, not statistically significant at n = 9 |
 | H5 | F1-optimal thresholding improves the chosen operating point | True by construction (post-hoc calibration); not an ablatable empirical claim |
 
