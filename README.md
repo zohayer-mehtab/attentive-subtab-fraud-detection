@@ -59,9 +59,9 @@ This repository contains the reference implementation for:
 
 | Attribute | IEEE-CIS | ULB |
 |---|---|---|
-| Transactions | 1M+ (58,200 train entities / 14,550 test entities) | 284,807 |
+| Transactions | 1M+ (~20,811 train entities / 14,550 test entities) | 284,807 |
 | Fraud rate (test) | 1.84% (267 / 14,550) | 0.172% |
-| Feature representation | 46 engineered (8 categorical, 38 numerical) → 68-dim after one-hot | 30-dim anonymized PCA components (Time, Amount, 28 PCA) |
+| Feature representation | 46 engineered (8 categorical, 38 numerical) → 7,325-dim after one-hot | 30-dim anonymized PCA components (Time, Amount, 28 PCA) |
 | Split | Chronological 80% / 20% | Chronological 80% / 20% (sorted by Time) |
 | Tuning | Primary dataset — architecture developed here | No dataset-specific tuning; same hyperparameters as IEEE-CIS |
 
@@ -84,11 +84,11 @@ The feature-engineering pipeline follows the Hyphatia framework: transactions ar
 
 ### 1. Feature-Space Partitioning
 
-The 68-dimensional feature space is divided into K = 4 overlapping subsets of expected dimensionality d_s ≈ 17, with 50% overlap between consecutive subsets to preserve cross-feature relationships. K and the overlap fraction are held fixed across all experiments.
+The 7,325-dimensional feature space is divided into K = 4 overlapping subsets of d_s = 3,663 features each (roughly half the input width), taken with a stride of 1,831 so that consecutive subsets share 50% of their features. The last subset wraps around to the start of the vector, so every feature appears in exactly two subsets. K and the overlap fraction are held fixed across all experiments.
 
 ![Overlapping subset generation and swap-noise corruption](assets/subset_generation.png)
 
-**Figure 2.** The 46-feature input vector is arranged so that contiguous index ranges correspond to semantically related groups (identity/device, amount, spatial, temporal, obfuscated). K = 4 overlapping subsets are generated with a stride that preserves semantic contiguity, so every feature appears in at least one view. During pretraining, swap-noise (ρ = 0.2) replaces a fraction of entries in each subset with the same feature drawn from a different row in the batch — preserving marginal feature distributions while destroying joint structure, forcing each encoder to recover inter-feature dependencies rather than memorize values.
+**Figure 2.** The input vector is arranged so that contiguous index ranges correspond to semantically related groups (identity/device, card, email-domain, and temporal-aggregate features). K = 4 overlapping subsets of d_s = 3,663 features each are generated with a stride of 1,831, so every feature falls in exactly two subsets (the last subset wraps around to the start of the vector). During pretraining, swap-noise (ρ = 0.2) replaces a fraction of entries in each subset with the same feature drawn from a different row in the batch — preserving marginal feature distributions while destroying joint structure, forcing each encoder to recover inter-feature dependencies rather than memorize values.
 
 ### 2. Subset-Specific Encoding + Self-Supervised Pretraining
 
@@ -100,7 +100,7 @@ Swap-noise-corrupted subsets are reconstructed by a matching decoder during a 5-
 
 ![Specialist encoder and reconstruction decoder detail](assets/specialist_encoder.png)
 
-**Figure 3.** Each of the four subset-specific encoders (d_s → 1024 → 512, ≈545K parameters each, ≈2.18M total) has independent weights — no sharing across subsets. Each is paired with a reconstruction decoder (512 → 1024 → d_s, ≈543K parameters each) used only during the 5-epoch SSL pretraining phase and discarded before fine-tuning, so the ≈2.18M decoder parameters never affect inference cost.
+**Figure 3.** Each of the four subset-specific encoders (d_s → 1024 → 512, ≈4.28M parameters each, ≈17.1M total) has independent weights — no sharing across subsets. Each is paired with a reconstruction decoder (512 → 1024 → d_s, ≈4.27M parameters each, ≈17.1M total) used only during the 5-epoch SSL pretraining phase and discarded before fine-tuning, so the decoder parameters never affect inference cost.
 
 ### 3. Multi-Head Self-Attention Fusion
 
@@ -108,7 +108,7 @@ The four subset representations are stacked into Z = [z₁, ..., z₄] and passe
 
 $$\hat{Z} = \text{LayerNorm}(Z + \text{MHSA}(Z, Z, Z)), \qquad z_f = \frac{1}{K}\sum_{i=1}^{K}\hat{Z}_i$$
 
-This is the single architectural change the ablation study isolates most cleanly (Section 5.3 below): it is the only component in the two-track ablation with a statistically significant effect on all three headline metrics.
+This is the single architectural change the ablation study isolates most cleanly (Section 5.3 below): it has a statistically significant effect on AUROC and PR-AUC, with recall improving in the same direction but falling just short of significance (p ≈ .06).
 
 ![Multi-head self-attention fusion detail](assets/mhsa_fusion.png)
 
@@ -137,7 +137,7 @@ Rather than the default 0.5 threshold, the decision threshold that maximizes F1 
 
 ```bash
 # Clone the repository
-git clone https://github.com/<zohayer-mehtab>/attentive-subtab-fraud-detection.git
+git clone https://github.com/zohayer-mehtab/attentive-subtab-fraud-detection.git
 cd attentive-subtab-fraud-detection
 
 # Create virtual environment
@@ -191,7 +191,7 @@ Attentive-SubTab substantially raises recall and AUROC relative to XGBoost, at t
 | Decision Tree | 0.5015 ± 0.0032 | 0.0177 ± 0.0001 | 0.1627 ± 0.0092 |
 | XGBoost | 0.6602 ± 0.0000 | **0.1073 ± 0.0000** | 0.1348 ± 0.0000 |
 | Hyphatia (SubTab + MLP) | 0.6744 | – | – |
-| **Attentive-SubTab (Ours)** | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0694** |
+| **Attentive-SubTab (Ours)** | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0630** |
 
 Baseline XGBoost and Decision Tree models were implemented using standard scikit-learn and xgboost Python libraries with chronological training/testing splits, and are not included in this repository to maintain focus on the proposed neural architecture.
 
@@ -201,9 +201,9 @@ Baseline XGBoost and Decision Tree models were implemented using standard scikit
 
 ### Latent Space Visualization
 
-![t-SNE projection of the fused test-set representation, colored by class](assets/tsne_latent_space.png)
+![t-SNE projection of the IEEE-CIS test-set transaction features, colored by class](assets/tsne_latent_space.png)
 
-**Figure 6.** t-SNE projection of the fused representation z_f for the IEEE-CIS test set, colored by class. Fraud (red) is not confined to a single region: most clusters are a mix of legitimate and fraudulent points, but several clusters — most visibly the dense red cluster near (−60, −25) — are almost entirely fraud, and a number of smaller clusters show fraud points concentrated at their edges or in tight sub-groups rather than scattered uniformly. This is consistent with the model's recall-oriented behavior: the representation separates a meaningful share of fraud into locally coherent regions, without producing clean global separation between the two classes — which is itself consistent with the modest PR-AUC reported in Table 1.
+**Figure 6.** Two-dimensional t-SNE projection of the IEEE-CIS test-set transaction features. Fraudulent transactions form a small number of locally dense neighborhoods — most clearly the small clusters in the lower-left part of the plot — but are otherwise dispersed among legitimate transactions. This is a qualitative, projection-dependent view rather than evidence about any model's decision boundary (t-SNE does not preserve global geometry), included only to illustrate that fraud is not isolated into a single region. It is at least consistent with the trade-off reported above: a tree ensemble captures a few high-purity pockets at high precision, while a model optimizing a smoother boundary reaches more of the scattered positives at lower precision.
 
 ### Decision-Threshold Analysis
 
@@ -224,7 +224,7 @@ At the F1-optimal threshold for a representative seed: 179 true positives, 88 fa
 | *Track 1: Architectural foundation* | | | |
 | Monolithic autoencoder (single shared encoder) | 0.7622 ± 0.0438 | **0.1397 ± 0.0494** | 0.5676 ± 0.1447 |
 | *Track 2: Attentive-SubTab mechanics* | | | |
-| **Full model** (dedicated encoders + attention) | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0694** |
+| **Full model** (dedicated encoders + attention) | **0.7813 ± 0.0190** | 0.0646 ± 0.0108 | **0.6097 ± 0.0630** |
 | w/o attention fusion (dedicated encoders + mean pooling) | 0.7514 ± 0.0300 | 0.1539 ± 0.0293 | 0.5385 ± 0.0842 |
 | w/o pretraining | 0.7774 ± 0.0314 | 0.1037 ± 0.0500 | 0.6138 ± 0.1374 |
 | w/o swap noise | 0.7825 ± 0.0305 | 0.0622 ± 0.0104 | 0.6309 ± 0.1437 |
@@ -234,7 +234,7 @@ At the F1-optimal threshold for a representative seed: 179 true positives, 88 fa
 
 **Figure 8.** Ablation results across architectural and training-recipe variants.
 
-**Key finding (H3, attention fusion — supported)**: comparing the full model against the no-attention variant isolates attention's effect: it raises recall from 0.5385 → 0.6912 (t ≈ 4.36, p < .001) and AUROC from 0.7514 → 0.7835 (t ≈ 2.67, p ≈ .02), but lowers PR-AUC from 0.1539 → 0.0665 (t ≈ −8.23, p < .001). This is the clearest evidence in the study for an architectural effect, and it is a trade-off, not a free lunch.
+**Key finding (H3, attention fusion — supported for AUROC, borderline for recall)**: comparing the full model against the no-attention variant isolates attention's effect: it raises AUROC from 0.7514 → 0.7813 (t ≈ 2.48, p ≈ .03) and recall from 0.5385 → 0.6097, though high seed-to-seed variance keeps this short of conventional significance (t ≈ 2.03, p ≈ .06). It significantly lowers PR-AUC from 0.1539 → 0.0665 (t ≈ −8.23, p < .001). The clearest unambiguous architectural effect of attention is therefore the AUROC/PR-AUC trade-off; the recall gain is directionally consistent but not decisively established here.
 
 **Key finding (H1, subsetting + dedicated encoding — not supported in isolation)**: the monolithic single-encoder baseline and the no-attention (dedicated encoders + mean-pooling) variant are statistically indistinguishable on all three metrics, despite the four dedicated encoders together holding roughly 4× the parameters of the monolithic encoder. Dedicated encoding alone does not measurably help; the benefit only appears once attention fusion is added on top.
 
